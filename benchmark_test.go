@@ -54,3 +54,39 @@ func BenchmarkWeighted(b *testing.B) {
 		}
 	}
 }
+
+func BenchmarkRoundRobin_Parallel(b *testing.B) {
+	router := benchmarkRouter(b, llmrouter.RoundRobin(), 100)
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			if _, err := router.Next(); err != nil {
+				b.Fatalf("Next failed: %v", err)
+			}
+		}
+	})
+}
+
+func BenchmarkRandom_Parallel(b *testing.B) {
+	router := benchmarkRouter(b, llmrouter.Random(), 100)
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			if _, err := router.Next(); err != nil {
+				b.Fatalf("Next failed: %v", err)
+			}
+		}
+	})
+}
+
+func BenchmarkWeighted_Parallel(b *testing.B) {
+	router := benchmarkRouter(b, llmrouter.Weighted(), 100)
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			if _, err := router.Next(); err != nil {
+				b.Fatalf("Next failed: %v", err)
+			}
+		}
+	})
+}
