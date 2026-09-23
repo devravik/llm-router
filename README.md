@@ -5,9 +5,9 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/devravik/llm-router)](https://goreportcard.com/report/github.com/devravik/llm-router)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**LLM API key rotation and provider routing for Go.**
+LLM API key rotation and provider routing for Go with zero external dependencies.
 
-Route requests across multiple API keys, models, providers, and custom OpenAI-compatible endpoints with **zero external dependencies**.
+Route requests across multiple API keys, models, providers, and custom OpenAI-compatible endpoints.
 
 ```go
 router := llmrouter.New(
@@ -31,32 +31,32 @@ route, err := router.Next()
 // route.ID, route.Provider, route.Model, route.APIKey
 ```
 
-`llm-router` solves one specific problem: **efficiently rotating and selecting LLM credentials and endpoints without manually switching keys or writing ad-hoc routing logic.**
+`llm-router` solves one specific problem: rotating and selecting LLM credentials and endpoints without manually switching keys or maintaining custom synchronization logic.
 
-The router chooses *which route to use*. Your application remains in complete control over how to execute the actual HTTP request or SDK call.
+The router selects which route to use. The caller remains responsible for executing the network request using their preferred HTTP client or provider SDK.
 
 ---
 
-## Why llm-router?
+## Comparison
 
-| Capability | `llm-router` | Ad-hoc / DIY Slices | Heavy Proxies / Gateways |
-| :--- | :---: | :---: | :---: |
-| **Multiple API Key Rotation** | :white_check_mark: Yes | :warning: Manual tracking | :white_check_mark: Yes |
-| **Multi-Provider Support** | :white_check_mark: Yes | :warning: Custom maps | :white_check_mark: Yes |
-| **Round Robin Strategy** | :white_check_mark: Built-in | :warning: Needs atomics/locks | :white_check_mark: Yes |
-| **Weighted Traffic Splitting** | :white_check_mark: Built-in | :x: Complex math | :white_check_mark: Yes |
-| **Uniform Random Selection** | :white_check_mark: Built-in (`math/rand/v2`) | :warning: Lock contention | :white_check_mark: Yes |
-| **Custom / Self-Hosted Endpoints** | :white_check_mark: Yes (`BaseURL`) | :warning: Ad-hoc | :white_check_mark: Yes |
-| **Runtime Enable / Disable** | :white_check_mark: Yes (cooldowns/outages) | :x: Race prone | :white_check_mark: Yes |
-| **Thread-Safe & Lock-Contention Free** | :white_check_mark: Concurrency-Safe | :x: Race prone | :white_check_mark: Yes |
-| **External Dependencies** | **0 (Standard Library Only)** | 0 | Dozens + Docker |
-| **HTTP Interception Overhead** | **None (In-process selection)** | None | Added network hop (1-5ms+) |
+| Feature | `llm-router` | Ad-hoc Slice | HTTP Proxy / Gateway |
+| :--- | :--- | :--- | :--- |
+| Multiple API key rotation | Yes | Manual index tracking | Yes |
+| Multi-provider support | Yes | Custom maps | Yes |
+| Round-robin selection | Built-in | Requires mutex/atomics | Yes |
+| Weighted distribution | Built-in | Custom implementation | Yes |
+| Concurrent random selection | Built-in (`math/rand/v2`) | Mutex contention | Yes |
+| Custom endpoints (`BaseURL`) | Supported | Manual routing | Yes |
+| Runtime route enable/disable | Supported | Prone to data races | Yes |
+| Concurrency safety | Yes (`sync.RWMutex`) | Caller responsibility | Yes |
+| External dependencies | 0 (standard library only) | 0 | External daemon/containers |
+| Network latency overhead | None (in-process selection) | None | Network hop (1-5ms+) |
 
 ---
 
 ## Installation
 
-Requires **Go 1.22** or later:
+Requires Go 1.22 or later:
 
 ```bash
 go get github.com/devravik/llm-router
@@ -64,24 +64,24 @@ go get github.com/devravik/llm-router
 
 ---
 
-## Real-World Recipes & Examples
+## Runnable Examples
 
-Explore fully compilable, runnable examples in the [`examples/`](examples/) directory:
+Complete, runnable examples are provided in the [`examples/`](examples/) directory:
 
-| Recipe | Description | Source |
-| :--- | :--- | :--- |
-| **Rotate Multiple Groq Keys** | Distribute requests across multiple Groq API keys using round-robin to multiply rate limits. | [`examples/groq-key-rotation`](examples/groq-key-rotation/) |
-| **OpenAI + Anthropic Fallback** | Priority failover: route to primary provider (OpenAI) and automatically switch to backup (Anthropic) on errors. | [`examples/openai-fallback`](examples/openai-fallback/) |
-| **Multi-Provider Routing** | Unified dispatcher across OpenAI, Anthropic, Gemini, Groq, DeepSeek, and OpenRouter. | [`examples/multi-provider`](examples/multi-provider/) |
-| **Weighted Canary Routing** | Split traffic proportionally (e.g. 80% to economical Llama 3.3, 20% to deep reasoning GPT-4o). | [`examples/weighted-routing`](examples/weighted-routing/) |
-| **Custom & Self-Hosted Endpoints** | Route to local Ollama (`localhost:11434`), vLLM, or corporate proxies with cloud failover via `BaseURL`. | [`examples/custom-openai-endpoint`](examples/custom-openai-endpoint/) |
-| **HTTP 429 Cooldown & Backoff** | Dynamically disable a route upon hitting a rate limit and automatically re-enable it after a cooldown. | [`examples/runtime-disable`](examples/runtime-disable/) |
+| Directory | Description |
+| :--- | :--- |
+| [`examples/groq-key-rotation`](examples/groq-key-rotation/) | Distribute requests across multiple Groq API keys using round-robin. |
+| [`examples/openai-fallback`](examples/openai-fallback/) | Fallback to a secondary provider (Anthropic) when the primary (OpenAI) fails. |
+| [`examples/multi-provider`](examples/multi-provider/) | Dispatch requests across OpenAI, Anthropic, Gemini, Groq, DeepSeek, and OpenRouter. |
+| [`examples/weighted-routing`](examples/weighted-routing/) | Split traffic proportionally between different models (e.g., 80% fast, 20% reasoning). |
+| [`examples/custom-openai-endpoint`](examples/custom-openai-endpoint/) | Route to self-hosted Ollama (`localhost:11434`), vLLM, or corporate proxies via `BaseURL`. |
+| [`examples/runtime-disable`](examples/runtime-disable/) | Temporarily remove a key on HTTP 429 rate limit and re-enable it after a cooldown. |
 
 ---
 
-## Request Flow & Architectural Boundary
+## Architecture & Boundaries
 
-`llm-router` maintains a clean separation of concerns:
+`llm-router` maintains a clear boundary:
 
 ```text
 Application
@@ -96,40 +96,40 @@ LLM Client / SDK (net/http, official SDK, etc.)
 Provider API (Groq, Anthropic, OpenAI, Ollama, etc.)
 ```
 
-1. **Router**: Manages candidate routes, applies selection strategies, and returns a safe copy of the chosen `Route`.
-2. **Application**: Receives the `Route` and executes the network request using whatever HTTP client or provider SDK it prefers.
+1. **Router**: Tracks registered routes, checks eligibility, applies the configured selection strategy, and returns a copy of the selected `Route`.
+2. **Application**: Receives the `Route` and executes the network call.
 
-The router never makes network calls, handles retries, or parses provider responses.
+The library intentionally does not make HTTP calls, handle retries, parse provider payloads, or manage tokens.
 
 ---
 
-## Route Configuration & Lifecycle
+## Route Configuration
 
-A route represents an eligible LLM credential and endpoint target:
+A route represents a selectable configuration:
 
 ```go
 type Route struct {
-    ID       string // Unique route identifier (required)
-    Provider string // Provider name (e.g. "groq", "anthropic", "openai") - metadata
-    Model    string // Model name (e.g. "llama-3.3-70b", "gpt-4o")
-    APIKey   string // Credential secret (never logged or exposed)
-    BaseURL  string // Optional: overrides default endpoint (e.g. self-hosted Ollama/vLLM)
+    ID       string // Unique identifier (required)
+    Provider string // Provider label (e.g., "groq", "anthropic", "openai")
+    Model    string // Model name (e.g., "llama-3.3-70b", "gpt-4o")
+    APIKey   string // Credential secret
+    BaseURL  string // Optional endpoint override (e.g., self-hosted Ollama/vLLM)
     Weight   int    // Proportional weight for Weighted strategy (>= 0)
 }
 ```
 
-### Runtime Enable, Disable & Remove
+### Runtime Route Lifecycle
 
-Routes can be dynamically modified at runtime without stopping your service:
+Routes can be modified dynamically while the application is serving traffic:
 
 ```go
-// Temporarily take a key out of rotation (e.g. on HTTP 429 rate limit)
+// Temporarily exclude a route from selection (e.g., during cooldown)
 err := router.Disable("groq-primary")
 
-// Restore route eligibility after cooldown period
+// Restore route eligibility
 err = router.Enable("groq-primary")
 
-// Permanently remove a decommissioned key
+// Permanently remove a route
 err = router.Remove("groq-primary")
 ```
 
@@ -137,9 +137,9 @@ err = router.Remove("groq-primary")
 
 ## Routing Strategies
 
-### 1. Round Robin (Default)
+### Round Robin (Default)
 
-Selects active routes in sequential round-robin order. Guarantees fair distribution over $N \times k$ calls under high concurrency.
+Selects active routes sequentially. Ensures fair distribution over $N \times k$ calls under concurrent execution:
 
 ```go
 router := llmrouter.New(
@@ -147,9 +147,9 @@ router := llmrouter.New(
 )
 ```
 
-### 2. Weighted
+### Weighted
 
-Selects routes proportionally according to their `Weight`. A route with weight `8` receives roughly 4x the requests of a route with weight `2`. Routes with weight `0` are excluded from selection.
+Distributes requests proportionally based on `Route.Weight`. A route with weight `8` receives four times the traffic of a route with weight `2`. Routes with weight `0` are ignored.
 
 ```go
 router := llmrouter.New(
@@ -161,7 +161,7 @@ router.Add(llmrouter.Route{
     Provider: "groq",
     Model:    "llama-3.3-70b",
     APIKey:   os.Getenv("GROQ_KEY"),
-    Weight:   8, // 80%
+    Weight:   8,
 })
 
 router.Add(llmrouter.Route{
@@ -169,13 +169,13 @@ router.Add(llmrouter.Route{
     Provider: "openai",
     Model:    "gpt-4o",
     APIKey:   os.Getenv("OPENAI_KEY"),
-    Weight:   2, // 20%
+    Weight:   2,
 })
 ```
 
-### 3. Random
+### Random
 
-Selects eligible routes with uniform randomness. Uses `math/rand/v2` introduced in Go 1.22 for lock-free, concurrent randomness.
+Selects eligible routes uniformly at random. Uses `math/rand/v2` to avoid global lock contention.
 
 ```go
 router := llmrouter.New(
@@ -183,9 +183,9 @@ router := llmrouter.New(
 )
 ```
 
-### 4. Custom Strategies
+### Custom Strategies
 
-Implement the single-method `Strategy` interface to build domain-specific routing:
+Custom selection logic can be implemented via the `Strategy` interface:
 
 ```go
 type Strategy interface {
@@ -193,8 +193,9 @@ type Strategy interface {
 }
 ```
 
+Example priority fallback strategy:
+
 ```go
-// Example: Strict Priority Strategy
 type PriorityStrategy struct{}
 
 func (p *PriorityStrategy) Next(routes []llmrouter.Route) (llmrouter.Route, error) {
@@ -207,9 +208,9 @@ func (p *PriorityStrategy) Next(routes []llmrouter.Route) (llmrouter.Route, erro
 
 ---
 
-## Performance Benchmarks
+## Benchmarks
 
-Measured on an Intel Core i5-12400 (12 cores) running Linux `amd64` across **100 registered routes**:
+Benchmark results on Linux amd64 (12th Gen Intel Core i5-12400) across 100 configured routes:
 
 ```text
 goos: linux
@@ -224,39 +225,38 @@ BenchmarkRandom_Parallel-12        777202        1566 ns/op        9472 B/op    
 BenchmarkWeighted_Parallel-12      728376        1641 ns/op        9472 B/op        1 allocs/op
 ```
 
-* **Sub-2 microsecond selection** across 100 candidate routes.
-* **1 heap allocation** per selection (defensive slice copy preventing caller mutation).
-* **Linear scaling** under saturated parallel goroutine execution.
+* Selection overhead is ~1.3-1.8 microseconds with 100 routes.
+* One heap allocation per selection (defensive slice copy preventing caller mutation).
+* Scales linearly under saturated parallel goroutine load.
 
 ---
 
 ## Error Handling
 
-Sentinel errors allow explicit condition matching with `errors.Is`:
+Sentinel errors can be inspected using `errors.Is`:
 
 ```go
 route, err := router.Next()
 if err != nil {
     if errors.Is(err, llmrouter.ErrNoRoutes) {
-        // Handle all routes disabled or none registered
+        // No routes are registered or all routes are disabled
     }
 }
 ```
 
-| Error | Condition |
+| Error | Cause |
 | :--- | :--- |
 | `ErrNoRoutes` | No active routes available for selection |
-| `ErrNotFound` | Target route ID does not exist on `Remove`, `Enable`, or `Disable` |
+| `ErrNotFound` | Route ID not found on `Remove`, `Enable`, or `Disable` |
 | `ErrDuplicateRoute` | Route ID already registered on `Add` |
-| `ErrInvalidRoute` | Invalid configuration (empty `ID` or negative `Weight`) on `Add` |
+| `ErrInvalidRoute` | Empty `ID` or negative `Weight` on `Add` |
 
 ---
 
-## Community & Contributing
+## Contributing
 
-We welcome contributions! Please review our guidelines before submitting pull requests:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines, testing instructions, and code standards.
 
-* [Contributing Guide](CONTRIBUTING.md)
 * [Code of Conduct](CODE_OF_CONDUCT.md)
 * [Security Policy](SECURITY.md)
 

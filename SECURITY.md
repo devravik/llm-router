@@ -4,9 +4,9 @@
 
 We release patches and security updates for the current minor release of `llm-router`.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| v0.x    | :white_check_mark: |
+| Version | Supported |
+| ------- | --------- |
+| v0.x    | Yes       |
 
 ---
 
